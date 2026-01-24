@@ -46,9 +46,10 @@ export async function POST() {
     await laporKeDaniel();
 
     return NextResponse.json({ status: "read", message: "Success!" });
-  } catch { 
-  return NextResponse.json({ error: "Failed" }, { status: 500 });
-}
+  } catch (error) {
+  console.error(error); // Sekarang variabel 'error' sudah terpakai
+  return NextResponse.json({ error: "Gagal" }, { status: 500 });
+  }
 }
 
 // GET & DELETE tetap seperti sebelumnya
