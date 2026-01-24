@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { lines } from "./data";
 
 const QUESTION = "Please Type Your Name:";
@@ -7,9 +7,8 @@ const CORRECT_ANSWER = "Karina";
 
 function Home() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isMarking, setIsMarking] = useState(false);
 
-  // ========== Animation Parameters ==========
+  // ========== Parameter Animasi ==========
   const typingSpeed = 50;
   const cursorBlinkSpeed = 500;
   const finalPauseBeforeFading = 1500;
@@ -25,37 +24,8 @@ function Home() {
   const [removedChars, setRemovedChars] = useState<string[]>([]);
   const [showCursor, setShowCursor] = useState(true);
 
-  // 1. Ambil status awal (JALUR VIP DEVELOPMENT)
-  useEffect(() => {
-    // Cek apakah lagi jalan di komputer sendiri (localhost)
-    const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
-    if (isDev) {
-      console.log("🛠️ Dev Mode: Jalur VIP aktif, sikat animasinya!");
-      setPhase("typing");
-      return;
-    }
-
-    // Kalau di Vercel/Production, baru tanya Redis
-    fetch("/api/flag", { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.status === "read") {
-          setPhase("done");
-        }
-      })
-      .catch((err) => console.error("Redis Error:", err));
-  }, []);
-
-  // 2. Fungsi lapor ke Redis (Dibungkus useCallback)
-  const markAsRead = useCallback(() => {
-    if (isMarking) return;
-    setIsMarking(true);
-    
-    fetch("/api/flag", { method: "POST" })
-      .then(() => setPhase("done"))
-      .catch(() => setIsMarking(false));
-  }, [isMarking]);
+  // KITA HAPUS useEffect yang nanya status 'read' ke Redis
+  // Biar phase selalu mulai dari "typing" setiap dibuka.
 
   // Cursor blink
   useEffect(() => {
@@ -110,17 +80,18 @@ function Home() {
 
   const combinedTextArray = [...linesDisplay.map((line) => line + "\n"), getCurrentLinePartial()].join("").split("");
 
-  // 3. Fading logic (No Logic Overlap)
+  // Fading logic
   useEffect(() => {
     if (phase === "fading") {
       if (fadeOutIndex < combinedTextArray.length) {
         const timer = setTimeout(() => setFadeOutIndex((prev) => prev + 1), fadeInterval);
         return () => clearTimeout(timer);
       } else {
-        markAsRead();
+        // Kita nggak perlu panggil markAsRead() lagi di sini
+        setPhase("done");
       }
     }
-  }, [phase, fadeOutIndex, combinedTextArray.length, fadeInterval, markAsRead]);
+  }, [phase, fadeOutIndex, combinedTextArray.length, fadeInterval]);
 
   // Remove chars during fade
   useEffect(() => {
@@ -153,14 +124,8 @@ function Home() {
       )}
 
       {phase === "done" && (
-        <div className="flex flex-col items-center justify-center animate-in fade-in duration-1000 text-center">
-          <div className="text-white text-2xl mb-8">Best wishes to you</div>
-          <button 
-            onClick={() => fetch("/api/flag", { method: "DELETE" }).then(() => window.location.reload())}
-            className="opacity-5 hover:opacity-100 text-gray-600 text-xs transition-opacity mt-4"
-          >
-            [ Reset System ]
-          </button>
+        <div className="text-white text-2xl text-center animate-in fade-in duration-1000">
+          Best wishes to you
         </div>
       )}
     </div>
@@ -169,8 +134,19 @@ function Home() {
 
 export default function App() {
   const [userInput, setUserInput] = useState("");
+  const [sentNotif, setSentNotif] = useState(false);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setUserInput(e.target.value);
   const isAuthenticated = userInput.toLowerCase() === CORRECT_ANSWER.toLowerCase();
+
+  // PEMICU NOTIFIKASI TELEGRAM: Begitu login berhasil, langsung tembak API
+  useEffect(() => {
+    if (isAuthenticated && !sentNotif) {
+      fetch("/api/flag", { method: "POST" })
+        .then(() => setSentNotif(true))
+        .catch(() => console.error("Gagal kirim notif login"));
+    }
+  }, [isAuthenticated, sentNotif]);
 
   if (isAuthenticated) return <Home />;
 

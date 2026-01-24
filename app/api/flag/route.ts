@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
+// Kita tetap import Redis kalau sewaktu-waktu kamu mau log jumlah akses
 import { Redis } from "@upstash/redis";
 
-// SENJATA PAMUNGKAS: Paksa Vercel jangan nge-cache API ini!
-export const dynamic = 'force-dynamic'; 
-export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 
 const redis = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
-
-const FLAG_KEY = "love_letter_status";
 
 async function laporKeDaniel() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -23,9 +20,9 @@ async function laporKeDaniel() {
   }).format(new Date());
 
   const pesan = `🚀 *NOTIFIKASI SURAT*\n\n` +
-                `Halo Dan! Karina baru aja buka suratnya nih.\n` +
+                `Halo Dan! Karina baru aja masuk ke web nih.\n` +
                 `🕒 *Waktu:* ${waktu}\n\n` +
-                `Semangat, moga lancar urusannya! ❤️`;
+                `Siap-siap, dia lagi baca animasinya sekarang! ❤️`;
 
   if (token && chatId) {
     try {
@@ -46,36 +43,19 @@ async function laporKeDaniel() {
 
 export async function POST() {
   try {
-    await redis.set(FLAG_KEY, "read");
-    await laporKeDaniel(); // Telegram dipanggil DI SINI, gak pengaruh ke animasi
-    return NextResponse.json({ status: "read" });
+    // Kita panggil notifikasi segera
+    await laporKeDaniel();
+    
+    // (Opsional) Kamu bisa tetap simpan log akses di Redis kalau mau tau berapa kali dibuka
+    await redis.incr("total_akses_karina");
+
+    return NextResponse.json({ status: "success", message: "Notif terkirim!" });
   } catch {
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }
 
+// GET sekarang nggak wajib dipakai buat nge-skip animasi lagi
 export async function GET() {
-  try {
-    const status = await redis.get(FLAG_KEY);
-    // Tambahkan header anti-cache manual buat jaga-jaga
-    return NextResponse.json(
-      { status: status === "read" ? "read" : "unread" },
-      {
-        headers: {
-          'Cache-Control': 'no-store, max-age=0',
-        },
-      }
-    );
-  } catch {
-    return NextResponse.json({ status: "unread" });
-  }
-}
-
-export async function DELETE() {
-  try {
-    await redis.del(FLAG_KEY);
-    return NextResponse.json({ message: "Reset Berhasil" });
-  } catch {
-    return NextResponse.json({ error: "Gagal" }, { status: 500 });
-  }
+  return NextResponse.json({ status: "always_unread" });
 }
