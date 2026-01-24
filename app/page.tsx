@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { lines } from "./data";
 
 const QUESTION = "Please Type Your Name:";
@@ -7,7 +7,7 @@ const CORRECT_ANSWER = "Karina";
 
 function Home() {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isMarking, setIsMarking] = useState(false); // PENGAMAN: Biar gak nembak API berkali-kali
+  const [isMarking, setIsMarking] = useState(false);
 
   // ========== Animation Parameters ==========
   const typingSpeed = 50;
@@ -27,19 +27,19 @@ function Home() {
 
   // 1. Ambil status awal (Anti-Cache)
   useEffect(() => {
-    fetch("/api/flag", { cache: 'no-store' }) // PAKSA ambil data fresh
+    fetch("/api/flag", { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (data.status === "read") {
           setPhase("done");
         }
       })
-      .catch(() => console.error("Gagal konek Redis"));
+      .catch((err) => console.error("Redis Error:", err));
   }, []);
 
-  // 2. Fungsi lapor ke Redis (Dengan pengunci)
-  const markAsRead = () => {
-    if (isMarking) return; // Kalau lagi proses, jangan dobel
+  // 2. Fungsi lapor ke Redis (Dibungkus useCallback agar stabil)
+  const markAsRead = useCallback(() => {
+    if (isMarking) return;
     setIsMarking(true);
     
     fetch("/api/flag", { method: "POST" })
@@ -47,7 +47,7 @@ function Home() {
         setPhase("done");
       })
       .catch(() => setIsMarking(false));
-  };
+  }, [isMarking]);
 
   // Cursor blink
   useEffect(() => {
@@ -55,7 +55,7 @@ function Home() {
       setShowCursor((prev) => !prev);
     }, cursorBlinkSpeed);
     return () => clearInterval(cursorTimer);
-  }, []);
+  }, [cursorBlinkSpeed]);
 
   // Auto-scroll
   useEffect(() => {
@@ -89,7 +89,7 @@ function Home() {
         setPhase("waiting");
       }
     }
-  }, [phase, currentLine, typedIndex]); // Hapus 'lines' dari sini untuk hindari linting error
+  }, [phase, currentLine, typedIndex]); // 'lines' dihapus dari sini agar build sukses
 
   // Waiting to Fading
   useEffect(() => {
@@ -99,7 +99,7 @@ function Home() {
       }, finalPauseBeforeFading);
       return () => clearTimeout(timer);
     }
-  }, [phase]);
+  }, [phase, finalPauseBeforeFading]);
 
   const getCurrentLinePartial = () => {
     if (phase === "typing" && currentLine < lines.length) {
@@ -116,7 +116,7 @@ function Home() {
     getCurrentLinePartial(),
   ].join("").split("");
 
-  // Fading logic (PENGAMAN KETAT)
+  // 3. Fading logic (DIBERSIHKAN: No Overlap Error)
   useEffect(() => {
     if (phase === "fading") {
       if (fadeOutIndex < combinedTextArray.length) {
@@ -124,12 +124,12 @@ function Home() {
           setFadeOutIndex((prev) => prev + 1);
         }, fadeInterval);
         return () => clearTimeout(timer);
-      } else if (fadeOutIndex >= combinedTextArray.length && phase !== "done") {
-        // HANYA panggil jika animasi beneran tamat
+      } else if (fadeOutIndex >= combinedTextArray.length) {
+        // Panggil markAsRead saat animasi beneran tamat
         markAsRead();
       }
     }
-  }, [phase, fadeOutIndex, combinedTextArray.length]);
+  }, [phase, fadeOutIndex, combinedTextArray.length, fadeInterval, markAsRead]);
 
   // Remove chars during fade
   useEffect(() => {
@@ -140,7 +140,7 @@ function Home() {
       }, fadeDuration);
       return () => clearTimeout(timer);
     }
-  }, [phase, fadeOutIndex]);
+  }, [phase, fadeOutIndex, fadeDuration]);
 
   return (
     <div className="min-h-screen bg-black p-8 flex flex-col items-center justify-center">
