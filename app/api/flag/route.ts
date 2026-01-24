@@ -61,3 +61,13 @@ export async function GET() {
     return NextResponse.json({ error: "Redis Connection Error" }, { status: 500 });
   }
 }
+
+// Tambahkan ini di paling bawah route.ts
+export async function DELETE() {
+  try {
+    await redis.del(FLAG_KEY);
+    return NextResponse.json({ message: "Memory cleared! Animasinya bakal muncul lagi." });
+  } catch {
+    return NextResponse.json({ error: "Gagal reset Redis" }, { status: 500 });
+  }
+}

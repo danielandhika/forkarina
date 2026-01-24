@@ -92,7 +92,7 @@ function Home() {
         setPhase("waiting");
       }
     }
-  }, [phase, currentLine, typedIndex, lines]);
+  }, [phase, currentLine, typedIndex]);
 
   // ------------------------------
   // fading after all lines are printed
@@ -203,10 +203,23 @@ function Home() {
       }
       {
         phase === "done" && (
-          <div className="text-white text-xl leading-8 whitespace-pre-wrap overflow-y-auto max-h-[80vh] w-full px-4  border-gray-600 rounded-md text-center">
-            Best wishes to you
-          </div>
-        )
+    <div className="flex flex-col items-center justify-center min-h-[80vh]">
+      <div className="text-white text-xl leading-8 whitespace-pre-wrap text-center mb-8">
+        Best wishes to you
+      </div>
+      
+      {/* Tombol Reset Rahasia */}
+      <button 
+        onClick={() => {
+          fetch("/api/flag", { method: "DELETE" })
+            .then(() => window.location.reload());
+        }}
+        className="opacity-10 hover:opacity-100 text-gray-500 text-xs transition-opacity"
+      >
+        [ Reset Memory ]
+      </button>
+    </div>
+  )
       }
      
     </div>
