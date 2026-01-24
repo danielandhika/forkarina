@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
+export const dynamic = 'force-dynamic'; // Paksa Vercel buat ambil data fresh terus
+
 // JANGAN pakai Redis.fromEnv() karena Vercel KV menggunakan prefix KV_ 
 // bukan UPSTASH_REDIS_. Kita petakan manual agar pasti connect.
 const redis = new Redis({

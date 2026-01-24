@@ -5,49 +5,51 @@ import { lines } from "./data";
 const QUESTION = "Please Type Your Name:";
 const CORRECT_ANSWER = "Karina"; 
 
-
 function Home() {
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isMarking, setIsMarking] = useState(false); // PENGAMAN: Biar gak nembak API berkali-kali
 
   // ========== Animation Parameters ==========
-  const typingSpeed = 50; // Typing speed
-  const cursorBlinkSpeed = 500; // Cursor blink interval
-  const finalPauseBeforeFading = 1500; // Waiting time after all lines are printed
-  const fadeInterval = 10; // Interval between each character fading out
-  const fadeDuration = 2000; // Transition duration from opaque to transparent
-
+  const typingSpeed = 50;
+  const cursorBlinkSpeed = 500;
+  const finalPauseBeforeFading = 1500;
+  const fadeInterval = 10;
+  const fadeDuration = 2000;
 
   const [currentLine, setCurrentLine] = useState(0);
   const [typedIndex, setTypedIndex] = useState(0);
   const [linesDisplay, setLinesDisplay] = useState<string[]>([]);
   const [phase, setPhase] = useState<"typing" | "waiting" | "fading" | "done">("typing");
 
-  // fade out state
   const [fadeOutIndex, setFadeOutIndex] = useState(0);
   const [removedChars, setRemovedChars] = useState<string[]>([]);
-
   const [showCursor, setShowCursor] = useState(true);
 
+  // 1. Ambil status awal (Anti-Cache)
   useEffect(() => {
-    fetch("/api/flag")
+    fetch("/api/flag", { cache: 'no-store' }) // PAKSA ambil data fresh
       .then((res) => res.json())
       .then((data) => {
-        setPhase(data.status === "read" ? "done" : "typing");
-      });
+        if (data.status === "read") {
+          setPhase("done");
+        }
+      })
+      .catch(() => console.error("Gagal konek Redis"));
   }, []);
 
+  // 2. Fungsi lapor ke Redis (Dengan pengunci)
   const markAsRead = () => {
-  // Tambahkan log ini buat debug di console browser (F12)
-  console.log("Memicu markAsRead... mengirim status ke Redis"); 
-  
-  fetch("/api/flag", { method: "POST" })
-    .then(() => {
-      setPhase("done");
-    });
-};
+    if (isMarking) return; // Kalau lagi proses, jangan dobel
+    setIsMarking(true);
+    
+    fetch("/api/flag", { method: "POST" })
+      .then(() => {
+        setPhase("done");
+      })
+      .catch(() => setIsMarking(false));
+  };
 
-  // ------------------------------
-  // let cursor blink
+  // Cursor blink
   useEffect(() => {
     const cursorTimer = setInterval(() => {
       setShowCursor((prev) => !prev);
@@ -55,21 +57,17 @@ function Home() {
     return () => clearInterval(cursorTimer);
   }, []);
 
-  // ------------------------------
-  // scroll to bottom when new line added
+  // Auto-scroll
   useEffect(() => {
     if (phase !== "done" && phase !== "fading" && scrollRef.current) {
-    if (scrollRef.current) {
       scrollRef.current.scrollTo({
         top: scrollRef.current.scrollHeight,
         behavior: "smooth",
       });
     }
-  }
-  }, [linesDisplay, typedIndex, fadeOutIndex,phase]);
+  }, [linesDisplay, typedIndex, phase]);
 
-  // ------------------------------
-  // typing logic
+  // Typing logic
   useEffect(() => {
     if (phase === "typing") {
       if (currentLine < lines.length) {
@@ -80,14 +78,10 @@ function Home() {
           }, typingSpeed);
           return () => clearTimeout(timer);
         } else {
-          // current line is fully typed
-          const fullLine = currentLineText;
-          setLinesDisplay((prev) => [...prev, fullLine]);
-
-          // wait for pause duration
+          setLinesDisplay((prev) => [...prev, currentLineText]);
           const timer = setTimeout(() => {
             setCurrentLine((prev) => prev + 1);
-            setTypedIndex(0); // reset typedIndex
+            setTypedIndex(0);
           }, lines[currentLine].pause);
           return () => clearTimeout(timer);
         }
@@ -95,10 +89,9 @@ function Home() {
         setPhase("waiting");
       }
     }
-  }, [phase, currentLine, typedIndex]);
+  }, [phase, currentLine, typedIndex]); // Hapus 'lines' dari sini untuk hindari linting error
 
-  // ------------------------------
-  // fading after all lines are printed
+  // Waiting to Fading
   useEffect(() => {
     if (phase === "waiting") {
       const timer = setTimeout(() => {
@@ -106,36 +99,24 @@ function Home() {
       }, finalPauseBeforeFading);
       return () => clearTimeout(timer);
     }
-  }, [phase, finalPauseBeforeFading]);
+  }, [phase]);
 
-  // ------------------------------
-  // calculate the current line with typing effect
   const getCurrentLinePartial = () => {
-    if (phase === "typing") {
-      if (currentLine < lines.length) {
-        const text = lines[currentLine].text;
-        if (typedIndex >= text.length) {
-          return ""; // fully typed this line, cursor should be at the next line
-        }
+    if (phase === "typing" && currentLine < lines.length) {
+      const text = lines[currentLine].text;
+      if (typedIndex < text.length) {
         return text.slice(0, typedIndex) + (showCursor ? "_" : "");
-      } else {
-        return showCursor ? "_" : "";
       }
     }
-    return "";
+    return phase === "typing" || phase === "waiting" ? (showCursor ? "_" : "") : "";
   };
 
-  // ------------------------------
-  // combine all lines and current line with typing effect
   const combinedTextArray = [
     ...linesDisplay.map((line) => line + "\n"),
     getCurrentLinePartial(),
-  ]
-    .join("")
-    .split("");
+  ].join("").split("");
 
-  // ------------------------------
-  // fading out effect
+  // Fading logic (PENGAMAN KETAT)
   useEffect(() => {
     if (phase === "fading") {
       if (fadeOutIndex < combinedTextArray.length) {
@@ -143,15 +124,14 @@ function Home() {
           setFadeOutIndex((prev) => prev + 1);
         }, fadeInterval);
         return () => clearTimeout(timer);
-      } else {
-        setPhase("done");
+      } else if (fadeOutIndex >= combinedTextArray.length && phase !== "done") {
+        // HANYA panggil jika animasi beneran tamat
         markAsRead();
       }
     }
-  }, [phase, fadeOutIndex, combinedTextArray.length, fadeInterval]);
+  }, [phase, fadeOutIndex, combinedTextArray.length]);
 
-  // ------------------------------
-  // fading out effect: remove characters
+  // Remove chars during fade
   useEffect(() => {
     if (phase === "fading" && fadeOutIndex > 0) {
       const indexToFade = fadeOutIndex - 1;
@@ -160,102 +140,72 @@ function Home() {
       }, fadeDuration);
       return () => clearTimeout(timer);
     }
-  }, [phase, fadeOutIndex, fadeDuration]);
-
+  }, [phase, fadeOutIndex]);
 
   return (
-    <div className="min-h-screen bg-black p-8">
-      {
-        phase !== "done" && (
-          <div
+    <div className="min-h-screen bg-black p-8 flex flex-col items-center justify-center">
+      {phase !== "done" && (
+        <div
           ref={scrollRef}
-          className="text-white text-xl leading-8 whitespace-pre-wrap overflow-y-auto max-h-[80vh] w-full px-4 border border-gray-600 rounded-md content"
-          style={{
-            padding: "16px",
-            height: "80vh",
-            paddingBottom: "80px",
-          }}
+          className="text-white text-xl leading-8 whitespace-pre-wrap overflow-y-auto max-h-[80vh] w-full max-w-2xl px-4 border border-gray-600 rounded-md"
+          style={{ padding: "16px", height: "80vh" }}
         >
-          {(phase === "fading") ? (
-            // fading phase: show all text with fading out effect
-            combinedTextArray.map((char, i) => {
-              if (char === "\n") return <br key={i} />;
-              if (removedChars.includes(String(i))) return null;
-              const charFading = i < fadeOutIndex && phase === "fading";
-              return (
-                <span
-                  key={i}
-                  className="inline-block transition-opacity"
-                  style={{
-                    transitionDuration: `${fadeDuration}ms`,
-                    opacity: charFading  ? 0 : 1,
-                  }}
-                >
-                  {char}
-                </span>
-              );
-            })
-          ) : (
-            // typing/waiting phase: show current line with typing effect
-            [...linesDisplay, getCurrentLinePartial() || (showCursor ? "_" : " ")].map((line, index) => (
-              <div key={index}>{line}</div>
-            ))
-          )}
+          {combinedTextArray.map((char, i) => {
+            if (char === "\n") return <br key={i} />;
+            if (removedChars.includes(String(i))) return null;
+            const isCharFading = i < fadeOutIndex;
+            return (
+              <span
+                key={i}
+                className="inline-block transition-opacity"
+                style={{
+                  transitionDuration: `${fadeDuration}ms`,
+                  opacity: isCharFading ? 0 : 1,
+                }}
+              >
+                {char}
+              </span>
+            );
+          })}
         </div>
-        )
-      }
-      {
-        phase === "done" && (
-    <div className="flex flex-col items-center justify-center min-h-[80vh]">
-      <div className="text-white text-xl leading-8 whitespace-pre-wrap text-center mb-8">
-        Best wishes to you
-      </div>
-      
-      {/* Tombol Reset Rahasia */}
-      <button 
-        onClick={() => {
-          fetch("/api/flag", { method: "DELETE" })
-            .then(() => window.location.reload());
-        }}
-        className="opacity-10 hover:opacity-100 text-gray-500 text-xs transition-opacity"
-      >
-        [ Reset Memory ]
-      </button>
-    </div>
-  )
-      }
-     
+      )}
+
+      {phase === "done" && (
+        <div className="flex flex-col items-center justify-center animate-in fade-in duration-1000">
+          <div className="text-white text-2xl text-center mb-8">
+            Best wishes to you
+          </div>
+          <button 
+            onClick={() => {
+              fetch("/api/flag", { method: "DELETE" })
+                .then(() => window.location.reload());
+            }}
+            className="opacity-5 hover:opacity-100 text-gray-600 text-xs transition-opacity mt-4"
+          >
+            [ Reset System ]
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-
-
 export default function App() {
   const [userInput, setUserInput] = useState("");
-
-  // deal with user input
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setUserInput(value);
-  };
-
-  // verify user input
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setUserInput(e.target.value);
   const isAuthenticated = userInput.toLowerCase() === CORRECT_ANSWER.toLowerCase();
 
-  // if user input is correct, show the home page
-  if (isAuthenticated) {
-    return <Home />;
-  }
+  if (isAuthenticated) return <Home />;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black text-white">
-      <div className="p-6 rounded-lg shadow-lg w-96" style={{ backgroundColor: "#2b2d37" }}>
-        <h1 className="text-2xl font-bold mb-4 text-center">{QUESTION}</h1>
+    <div className="flex min-h-screen items-center justify-center bg-black text-white p-4">
+      <div className="p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-800" style={{ backgroundColor: "#1a1b23" }}>
+        <h1 className="text-xl font-medium mb-6 text-center text-gray-300">{QUESTION}</h1>
         <input
+          autoFocus
           type="text"
-          className="w-full p-2 text-black rounded-md"
-          placeholder="input answer"
+          className="w-full p-3 bg-gray-900 text-white border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 transition-all"
+          placeholder="Jawab di sini..."
           value={userInput}
           onChange={handleInputChange} 
         />
