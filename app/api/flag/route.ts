@@ -46,9 +46,9 @@ export async function POST() {
     await laporKeDaniel();
 
     return NextResponse.json({ status: "read", message: "Success!" });
-  } catch (error) {
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
-  }
+  } catch { 
+  return NextResponse.json({ error: "Failed" }, { status: 500 });
+}
 }
 
 // GET & DELETE tetap seperti sebelumnya
