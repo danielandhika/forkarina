@@ -37,11 +37,14 @@ function Home() {
   }, []);
 
   const markAsRead = () => {
-    fetch("/api/flag", { method: "POST" })
-      .then(() => {
-        setPhase("done");
-      });
-  };
+  // Tambahkan log ini buat debug di console browser (F12)
+  console.log("Memicu markAsRead... mengirim status ke Redis"); 
+  
+  fetch("/api/flag", { method: "POST" })
+    .then(() => {
+      setPhase("done");
+    });
+};
 
   // ------------------------------
   // let cursor blink
