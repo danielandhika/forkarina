@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
-const redis = Redis.fromEnv();
+// JANGAN pakai Redis.fromEnv() karena Vercel KV menggunakan prefix KV_ 
+// bukan UPSTASH_REDIS_. Kita petakan manual agar pasti connect.
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
+
 const FLAG_KEY = "love_letter_status";
 
-// Fungsi Helper Notifikasi (Gaya Laravel Notification)
 async function laporKeDaniel() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -39,21 +44,20 @@ async function laporKeDaniel() {
 
 export async function POST() {
   try {
-    // 1. Simpan di Redis (agar tidak muncul animasi lagi nanti)
     await redis.set(FLAG_KEY, "read");
-    
-    // 2. Kirim notif real-time ke Daniel
     await laporKeDaniel();
-
     return NextResponse.json({ status: "read", message: "Success!" });
-  } catch (error) {
-  console.error(error); // Sekarang variabel 'error' sudah terpakai
-  return NextResponse.json({ error: "Gagal" }, { status: 500 });
+  } catch { 
+    // HAPUS (error) agar tidak menyebabkan linting error 'unused vars' lagi
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }
 
-// GET & DELETE tetap seperti sebelumnya
 export async function GET() {
-  const status = await redis.get(FLAG_KEY);
-  return NextResponse.json({ status: status === "read" ? "read" : "unread" });
+  try {
+    const status = await redis.get(FLAG_KEY);
+    return NextResponse.json({ status: status === "read" ? "read" : "unread" });
+  } catch {
+    return NextResponse.json({ error: "Redis Connection Error" }, { status: 500 });
+  }
 }

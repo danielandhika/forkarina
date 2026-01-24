@@ -92,7 +92,7 @@ function Home() {
         setPhase("waiting");
       }
     }
-  }, [phase, currentLine, typedIndex]);
+  }, [phase, currentLine, typedIndex, lines]);
 
   // ------------------------------
   // fading after all lines are printed
