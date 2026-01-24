@@ -1,30 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400..700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
+  --background: #fff5f5; /* Sedikit sentuhan pink putih agar lebih hangat */
   --foreground: #171717;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #1a0f0f;
     --foreground: #ededed;
   }
 }
 
 body {
-  font-family: 'Xinzhongde Chensi', sans-serif;
-}
-
-@font-face {
-  font-family: 'Xinzhongde Chensi';
-  src: url('/xinzhongdechensi.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
+  /* Menggunakan Dancing Script sebagai font utama */
+  font-family: 'Dancing Script', cursive;
+  font-size: 1.25rem; /* Font script biasanya terlihat lebih kecil, jadi kita besarkan sedikit */
+  line-height: 1.6;
 }
 
 .content {
   user-select: none;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
 }
