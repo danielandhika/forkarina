@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 
-export const dynamic = 'force-dynamic'; // Paksa Vercel buat ambil data fresh terus
+// SENJATA PAMUNGKAS: Paksa Vercel jangan nge-cache API ini!
+export const dynamic = 'force-dynamic'; 
+export const revalidate = 0;
 
-// JANGAN pakai Redis.fromEnv() karena Vercel KV menggunakan prefix KV_ 
-// bukan UPSTASH_REDIS_. Kita petakan manual agar pasti connect.
 const redis = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
@@ -47,10 +47,9 @@ async function laporKeDaniel() {
 export async function POST() {
   try {
     await redis.set(FLAG_KEY, "read");
-    await laporKeDaniel();
-    return NextResponse.json({ status: "read", message: "Success!" });
-  } catch { 
-    // HAPUS (error) agar tidak menyebabkan linting error 'unused vars' lagi
+    await laporKeDaniel(); // Telegram dipanggil DI SINI, gak pengaruh ke animasi
+    return NextResponse.json({ status: "read" });
+  } catch {
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }
@@ -58,18 +57,25 @@ export async function POST() {
 export async function GET() {
   try {
     const status = await redis.get(FLAG_KEY);
-    return NextResponse.json({ status: status === "read" ? "read" : "unread" });
+    // Tambahkan header anti-cache manual buat jaga-jaga
+    return NextResponse.json(
+      { status: status === "read" ? "read" : "unread" },
+      {
+        headers: {
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      }
+    );
   } catch {
-    return NextResponse.json({ error: "Redis Connection Error" }, { status: 500 });
+    return NextResponse.json({ status: "unread" });
   }
 }
 
-// Tambahkan ini di paling bawah route.ts
 export async function DELETE() {
   try {
     await redis.del(FLAG_KEY);
-    return NextResponse.json({ message: "Memory cleared! Animasinya bakal muncul lagi." });
+    return NextResponse.json({ message: "Reset Berhasil" });
   } catch {
-    return NextResponse.json({ error: "Gagal reset Redis" }, { status: 500 });
+    return NextResponse.json({ error: "Gagal" }, { status: 500 });
   }
 }
