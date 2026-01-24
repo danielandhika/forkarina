@@ -1,26 +1,30 @@
-import {  NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
 
-const FLAG_PATH = path.join(process.cwd(), "read.flag");
+// Otomatis mengambil kredensial dari Environment Variables
+const redis = Redis.fromEnv();
+const FLAG_KEY = "love_letter_status";
 
-// 处理 GET、POST、DELETE 请求
 export async function GET() {
-  if (fs.existsSync(FLAG_PATH)) {
-    return NextResponse.json({ status: "read", message: "This page has already been read." });
+  try {
+    const status = await redis.get(FLAG_KEY);
+    
+    if (status === "read") {
+      return NextResponse.json({ status: "read", message: "Surat sudah dibaca." });
+    }
+    return NextResponse.json({ status: "unread", message: "Surat belum dibaca." });
+  } catch (error) {
+    console.error("Redis Error:", error);
+    return NextResponse.json({ error: "Gagal mengambil status" }, { status: 500 });
   }
-  return NextResponse.json({ status: "unread", message: "This page is available for reading." });
 }
 
 export async function POST() {
-  fs.writeFileSync(FLAG_PATH, "This page has been read.");
-  return NextResponse.json({ status: "read", message: "Page marked as read." });
+  await redis.set(FLAG_KEY, "read");
+  return NextResponse.json({ status: "read", message: "Status diperbarui: sudah dibaca." });
 }
 
-// 可选：用于重置访问权限
 export async function DELETE() {
-  if (fs.existsSync(FLAG_PATH)) {
-    fs.unlinkSync(FLAG_PATH);
-  }
-  return NextResponse.json({ status: "unread", message: "Page access reset." });
+  await redis.del(FLAG_KEY);
+  return NextResponse.json({ status: "unread", message: "Status telah di-reset." });
 }
