@@ -25,8 +25,18 @@ function Home() {
   const [removedChars, setRemovedChars] = useState<string[]>([]);
   const [showCursor, setShowCursor] = useState(true);
 
-  // 1. Ambil status awal (Anti-Cache)
+  // 1. Ambil status awal (JALUR VIP DEVELOPMENT)
   useEffect(() => {
+    // Cek apakah lagi jalan di komputer sendiri (localhost)
+    const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+    if (isDev) {
+      console.log("🛠️ Dev Mode: Jalur VIP aktif, sikat animasinya!");
+      setPhase("typing");
+      return;
+    }
+
+    // Kalau di Vercel/Production, baru tanya Redis
     fetch("/api/flag", { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
@@ -37,33 +47,26 @@ function Home() {
       .catch((err) => console.error("Redis Error:", err));
   }, []);
 
-  // 2. Fungsi lapor ke Redis (Dibungkus useCallback agar stabil)
+  // 2. Fungsi lapor ke Redis (Dibungkus useCallback)
   const markAsRead = useCallback(() => {
     if (isMarking) return;
     setIsMarking(true);
     
     fetch("/api/flag", { method: "POST" })
-      .then(() => {
-        setPhase("done");
-      })
+      .then(() => setPhase("done"))
       .catch(() => setIsMarking(false));
   }, [isMarking]);
 
   // Cursor blink
   useEffect(() => {
-    const cursorTimer = setInterval(() => {
-      setShowCursor((prev) => !prev);
-    }, cursorBlinkSpeed);
+    const cursorTimer = setInterval(() => setShowCursor((prev) => !prev), cursorBlinkSpeed);
     return () => clearInterval(cursorTimer);
   }, [cursorBlinkSpeed]);
 
   // Auto-scroll
   useEffect(() => {
     if (phase !== "done" && phase !== "fading" && scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth",
-      });
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
   }, [linesDisplay, typedIndex, phase]);
 
@@ -73,9 +76,7 @@ function Home() {
       if (currentLine < lines.length) {
         const currentLineText = lines[currentLine].text;
         if (typedIndex < currentLineText.length) {
-          const timer = setTimeout(() => {
-            setTypedIndex((prev) => prev + 1);
-          }, typingSpeed);
+          const timer = setTimeout(() => setTypedIndex((prev) => prev + 1), typingSpeed);
           return () => clearTimeout(timer);
         } else {
           setLinesDisplay((prev) => [...prev, currentLineText]);
@@ -89,14 +90,12 @@ function Home() {
         setPhase("waiting");
       }
     }
-  }, [phase, currentLine, typedIndex]); // 'lines' dihapus dari sini agar build sukses
+  }, [phase, currentLine, typedIndex]);
 
   // Waiting to Fading
   useEffect(() => {
     if (phase === "waiting") {
-      const timer = setTimeout(() => {
-        setPhase("fading");
-      }, finalPauseBeforeFading);
+      const timer = setTimeout(() => setPhase("fading"), finalPauseBeforeFading);
       return () => clearTimeout(timer);
     }
   }, [phase, finalPauseBeforeFading]);
@@ -104,28 +103,20 @@ function Home() {
   const getCurrentLinePartial = () => {
     if (phase === "typing" && currentLine < lines.length) {
       const text = lines[currentLine].text;
-      if (typedIndex < text.length) {
-        return text.slice(0, typedIndex) + (showCursor ? "_" : "");
-      }
+      if (typedIndex < text.length) return text.slice(0, typedIndex) + (showCursor ? "_" : "");
     }
     return phase === "typing" || phase === "waiting" ? (showCursor ? "_" : "") : "";
   };
 
-  const combinedTextArray = [
-    ...linesDisplay.map((line) => line + "\n"),
-    getCurrentLinePartial(),
-  ].join("").split("");
+  const combinedTextArray = [...linesDisplay.map((line) => line + "\n"), getCurrentLinePartial()].join("").split("");
 
-  // 3. Fading logic (DIBERSIHKAN: No Overlap Error)
+  // 3. Fading logic (No Logic Overlap)
   useEffect(() => {
     if (phase === "fading") {
       if (fadeOutIndex < combinedTextArray.length) {
-        const timer = setTimeout(() => {
-          setFadeOutIndex((prev) => prev + 1);
-        }, fadeInterval);
+        const timer = setTimeout(() => setFadeOutIndex((prev) => prev + 1), fadeInterval);
         return () => clearTimeout(timer);
-      } else if (fadeOutIndex >= combinedTextArray.length) {
-        // Panggil markAsRead saat animasi beneran tamat
+      } else {
         markAsRead();
       }
     }
@@ -135,9 +126,7 @@ function Home() {
   useEffect(() => {
     if (phase === "fading" && fadeOutIndex > 0) {
       const indexToFade = fadeOutIndex - 1;
-      const timer = setTimeout(() => {
-        setRemovedChars((prev) => [...prev, String(indexToFade)]);
-      }, fadeDuration);
+      const timer = setTimeout(() => setRemovedChars((prev) => [...prev, String(indexToFade)]), fadeDuration);
       return () => clearTimeout(timer);
     }
   }, [phase, fadeOutIndex, fadeDuration]);
@@ -155,14 +144,7 @@ function Home() {
             if (removedChars.includes(String(i))) return null;
             const isCharFading = i < fadeOutIndex;
             return (
-              <span
-                key={i}
-                className="inline-block transition-opacity"
-                style={{
-                  transitionDuration: `${fadeDuration}ms`,
-                  opacity: isCharFading ? 0 : 1,
-                }}
-              >
+              <span key={i} className="inline-block transition-opacity" style={{ transitionDuration: `${fadeDuration}ms`, opacity: isCharFading ? 0 : 1 }}>
                 {char}
               </span>
             );
@@ -171,15 +153,10 @@ function Home() {
       )}
 
       {phase === "done" && (
-        <div className="flex flex-col items-center justify-center animate-in fade-in duration-1000">
-          <div className="text-white text-2xl text-center mb-8">
-            Best wishes to you
-          </div>
+        <div className="flex flex-col items-center justify-center animate-in fade-in duration-1000 text-center">
+          <div className="text-white text-2xl mb-8">Best wishes to you</div>
           <button 
-            onClick={() => {
-              fetch("/api/flag", { method: "DELETE" })
-                .then(() => window.location.reload());
-            }}
+            onClick={() => fetch("/api/flag", { method: "DELETE" }).then(() => window.location.reload())}
             className="opacity-5 hover:opacity-100 text-gray-600 text-xs transition-opacity mt-4"
           >
             [ Reset System ]
@@ -199,16 +176,9 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black text-white p-4">
-      <div className="p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-800" style={{ backgroundColor: "#1a1b23" }}>
+      <div className="p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-800 bg-[#1a1b23]">
         <h1 className="text-xl font-medium mb-6 text-center text-gray-300">{QUESTION}</h1>
-        <input
-          autoFocus
-          type="text"
-          className="w-full p-3 bg-gray-900 text-white border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 transition-all"
-          placeholder="Jawab di sini..."
-          value={userInput}
-          onChange={handleInputChange} 
-        />
+        <input autoFocus type="text" className="w-full p-3 bg-gray-900 text-white border border-gray-700 rounded-lg" placeholder="Jawab di sini..." value={userInput} onChange={handleInputChange} />
       </div>
     </div>
   );
