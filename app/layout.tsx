@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "✨ Love's Silent Whisper ✨",
+  title: "✨ Daniel's Silent Whisper ✨",
   description: "The silence often of pure innocence persuades, when speaking fails.",
 };
 

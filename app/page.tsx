@@ -154,7 +154,7 @@ export default function App() {
     <div className="flex min-h-screen items-center justify-center bg-black text-white p-4">
       <div className="p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-800 bg-[#1a1b23]">
         <h1 className="text-xl font-medium mb-6 text-center text-gray-300">{QUESTION}</h1>
-        <input autoFocus type="text" className="w-full p-3 bg-gray-900 text-white border border-gray-700 rounded-lg" placeholder="Jawab di sini..." value={userInput} onChange={handleInputChange} />
+        <input autoFocus type="text" className="w-full p-3 bg-gray-900 text-white border border-gray-700 rounded-lg" placeholder="Type Here..." value={userInput} onChange={handleInputChange} />
       </div>
     </div>
   );
