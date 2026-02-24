@@ -8,8 +8,9 @@
 
 export const lines: LineInfo[] = [
     { text: "Hey, it's been a long time. How have you been?", pause: 1000 },
-  {text: "oke enough. hehe. sukses ya"},
-   /* { text: "I wasn’t sure if I should reach out, but here I am, writing this.", pause: 1000 },
+  { text: "oke enough. hehe. sukses ya", pause: 1000},
+   /** 
+   { text: "I wasn’t sure if I should reach out, but here I am, writing this.", pause: 1000 },
     { text: "It’s funny how time flies, isn’t it?", pause: 1000 },
     { text: "I remember the first time we met—do you?", pause: 1000 },
     { text: "It was that sunny afternoon at the coffee shop, just couple hours before my flight time and in the midst of your work schedule.", pause: 1000 },
